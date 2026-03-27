@@ -10,19 +10,6 @@
 </head>
 <body>
   <div class="app">
-    <header class="header">
-      <div class="logo">
-        <i data-lucide="video"></i>
-        <span>Video Chat</span>
-      </div>
-      <div class="room-info" id="roomInfo" style="display: none;">
-        <span class="room-code" id="roomCodeDisplay"></span>
-        <button class="icon-btn" id="copyRoomBtn" title="Copy room code">
-          <i data-lucide="copy"></i>
-        </button>
-      </div>
-    </header>
-
     <main class="main">
       <div class="welcome-screen" id="welcomeScreen">
         <div class="welcome-card">
@@ -61,7 +48,7 @@
               <span id="remoteLabel">Waiting for peer...</span>
             </div>
           </div>
-          <div class="video-container local">
+          <div class="video-container local" id="localContainer">
             <video id="localVideo" autoplay muted playsinline></video>
             <div class="video-label">
               <span>You</span>
@@ -69,23 +56,19 @@
           </div>
         </div>
 
-        <div class="status-bar" id="statusBar">
-          <div class="room-code-pill" id="roomCodePill">
-            <span id="roomCodeDisplay">------</span>
+        <div class="top-bar" id="topBar">
+          <div class="room-code-pill">
+            <span id="roomCodeText">------</span>
             <button class="copy-btn" id="copyRoomBtn" title="Copy room code">
               <i data-lucide="copy"></i>
             </button>
           </div>
-          <div class="signal-indicator" id="signalIndicator">
-            <i data-lucide="signal"></i>
-            <span id="signalStatus">Connecting...</span>
-          </div>
-          <button class="view-mode-btn" id="viewModeBtn" title="Toggle view mode">
-            <i data-lucide="layout-grid"></i>
-          </button>
         </div>
 
-        <div class="controls">
+        <div class="controls" id="controls">
+          <button class="control-btn" id="viewModeBtn" title="Toggle view mode">
+            <i data-lucide="layout-grid"></i>
+          </button>
           <button class="control-btn" id="toggleMicBtn" title="Toggle microphone">
             <i data-lucide="mic"></i>
           </button>
@@ -95,6 +78,11 @@
           <button class="control-btn end-call" id="endCallBtn" title="End call">
             <i data-lucide="phone-off"></i>
           </button>
+        </div>
+
+        <div class="signal-indicator" id="signalIndicator">
+          <i data-lucide="signal"></i>
+          <span id="signalStatus">Connecting...</span>
         </div>
 
         <button class="chat-bubble" id="chatBubble">

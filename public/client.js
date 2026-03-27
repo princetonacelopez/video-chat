@@ -8,6 +8,7 @@ let isCameraOff = false;
 let pendingIceCandidates = [];
 let roomExpired = false;
 let viewMode = 'side-by-side';
+let peerSocketId = null;
 
 const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -41,7 +42,7 @@ function connectToServer(code) {
   socket = io();
   
   socket.on('connect', () => {
-    console.log('Connected to server');
+    console.log('Connected to server with ID:', socket.id);
     updateConnectionStatus('connected', 'Connected');
     socket.emit('join-room', { roomCode, isInitiator });
   });
@@ -50,22 +51,27 @@ function connectToServer(code) {
     showEndCallOverlay('Room expired');
   });
 
-  socket.on('peer-count', (count) => {
-    console.log('Peer count:', count);
-    if (count === 2 && !isInitiator) {
-      createPeerConnectionAndOffer();
-    }
+  socket.on('room-full', () => {
+    alert('Room is full');
+    returnHome();
   });
 
-  socket.on('peer-joined', async (peerId) => {
-    console.log('Peer joined:', peerId);
+  socket.on('peer-count', (count) => {
+    console.log('Peer count:', count);
+  });
+
+  socket.on('peer-joined', async (data) => {
+    console.log('Peer joined:', data);
+    peerSocketId = data.socketId;
+    document.getElementById('remoteLabel').textContent = 'Peer';
     if (isInitiator) {
       await createPeerConnectionAndOffer();
     }
   });
 
-  socket.on('peer-left', (peerId) => {
-    console.log('Peer left:', peerId);
+  socket.on('peer-left', (data) => {
+    console.log('Peer left:', data);
+    peerSocketId = null;
     handlePeerDisconnected();
   });
 
@@ -75,20 +81,24 @@ function connectToServer(code) {
   });
 
   socket.on('offer', async ({ offer, from }) => {
-    console.log('Received offer');
+    console.log('Received offer from:', from);
+    peerSocketId = from;
     await createPeerConnection();
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    socket.emit('answer', { roomCode, answer });
+    socket.emit('answer', { roomCode, answer, to: from });
   });
 
   socket.on('answer', async ({ answer }) => {
     console.log('Received answer');
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    if (peerConnection) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    }
   });
 
-  socket.on('ice-candidate', async ({ candidate }) => {
+  socket.on('ice-candidate', async ({ candidate, from }) => {
+    console.log('Received ICE candidate from:', from);
     if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
       try {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -101,6 +111,7 @@ function connectToServer(code) {
   });
 
   socket.on('chat-message', ({ text, from }) => {
+    console.log('Received chat message:', text);
     addChatMessage(text, 'received');
   });
 
@@ -114,7 +125,7 @@ async function createPeerConnectionAndOffer() {
   await createPeerConnection();
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
-  socket.emit('offer', { roomCode, offer: offer });
+  socket.emit('offer', { roomCode, offer: offer, to: peerSocketId });
 }
 
 async function createPeerConnection() {
@@ -122,12 +133,12 @@ async function createPeerConnection() {
   
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      socket.emit('ice-candidate', { roomCode, candidate: event.candidate });
+      socket.emit('ice-candidate', { roomCode, candidate: event.candidate, to: peerSocketId });
     }
   };
   
   peerConnection.ontrack = (event) => {
-    console.log('Received remote track');
+    console.log('Received remote track', event.streams[0]);
     document.getElementById('remoteVideo').srcObject = event.streams[0];
     document.getElementById('videoPlaceholder').classList.add('hidden');
     document.getElementById('remoteLabel').textContent = 'Peer';
@@ -229,10 +240,12 @@ function updateConnectionStatus(status, text) {
   const statusElement = document.getElementById('connectionStatus');
   const statusItem = document.querySelector('.status-item');
   
-  statusElement.textContent = text;
-  statusItem.className = `status-item ${status}`;
-  
-  lucide.createIcons();
+  if (statusElement) {
+    statusElement.textContent = text;
+  }
+  if (statusItem) {
+    statusItem.className = `status-item ${status}`;
+  }
 }
 
 function toggleMic() {
@@ -315,7 +328,7 @@ function returnHome() {
   document.getElementById('videoScreen').classList.remove('active');
   document.getElementById('videoPlaceholder').classList.remove('hidden');
   document.getElementById('remoteLabel').textContent = 'Waiting for peer...';
-  document.getElementById('roomCodeDisplay').textContent = '------';
+  document.getElementById('roomCodeText').textContent = '------';
   document.getElementById('chatMessages').innerHTML = '';
   document.getElementById('chatOverlay').classList.add('collapsed');
   document.getElementById('chatBubble').classList.remove('show');
@@ -337,6 +350,8 @@ function returnHome() {
   isMuted = false;
   isCameraOff = false;
   roomExpired = false;
+  peerSocketId = null;
+  pendingIceCandidates = [];
   
   lucide.createIcons();
 }
@@ -381,7 +396,7 @@ async function joinRoom(code) {
 function showVideoScreen() {
   document.getElementById('welcomeScreen').style.display = 'none';
   document.getElementById('videoScreen').classList.add('active');
-  document.getElementById('roomCodeDisplay').textContent = roomCode;
+  document.getElementById('roomCodeText').textContent = roomCode;
   document.getElementById('chatBubble').classList.add('show');
   
   document.getElementById('signalIndicator').classList.add('poor');
@@ -447,7 +462,7 @@ document.querySelectorAll('.emoji-btn').forEach(btn => {
 document.getElementById('sendChatBtn').addEventListener('click', () => {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
-  if (text) {
+  if (text && socket) {
     sendChatMessage(text);
     input.value = '';
   }
@@ -456,7 +471,7 @@ document.getElementById('sendChatBtn').addEventListener('click', () => {
 document.getElementById('chatInput').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     const text = e.target.value.trim();
-    if (text) {
+    if (text && socket) {
       sendChatMessage(text);
       e.target.value = '';
     }

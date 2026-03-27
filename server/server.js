@@ -25,6 +25,8 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join-room', ({ roomCode, isInitiator }) => {
+    console.log(`User ${socket.id} joining room ${roomCode} as initiator:`, isInitiator);
+    
     const room = rooms.get(roomCode);
     
     if (room && room.expired) {
@@ -52,25 +54,51 @@ io.on('connection', (socket) => {
     
     const peerCount = roomData.sockets.size;
     socket.emit('peer-count', peerCount);
-    socket.to(roomCode).emit('peer-joined', socket.id);
     
-    console.log(`User ${socket.id} joined room ${roomCode}. Total: ${peerCount}`);
+    socket.to(roomCode).emit('peer-joined', { 
+      socketId: socket.id,
+      isInitiator: isInitiator
+    });
+    
+    console.log(`Room ${roomCode} now has ${peerCount} peer(s)`);
   });
 
-  socket.on('offer', ({ roomCode, offer }) => {
-    socket.to(roomCode).emit('offer', { offer, from: socket.id });
+  socket.on('offer', ({ roomCode, offer, to }) => {
+    console.log(`Sending offer to ${to}`);
+    socket.to(to).emit('offer', { 
+      offer, 
+      from: socket.id 
+    });
   });
 
-  socket.on('answer', ({ roomCode, answer }) => {
-    socket.to(roomCode).emit('answer', { answer, from: socket.id });
+  socket.on('answer', ({ roomCode, answer, to }) => {
+    console.log(`Sending answer to ${to}`);
+    socket.to(to).emit('answer', { 
+      answer, 
+      from: socket.id 
+    });
   });
 
-  socket.on('ice-candidate', ({ roomCode, candidate }) => {
-    socket.to(roomCode).emit('ice-candidate', { candidate, from: socket.id });
+  socket.on('ice-candidate', ({ roomCode, candidate, to }) => {
+    if (to) {
+      socket.to(to).emit('ice-candidate', { 
+        candidate, 
+        from: socket.id 
+      });
+    } else {
+      socket.to(roomCode).emit('ice-candidate', { 
+        candidate, 
+        from: socket.id 
+      });
+    }
   });
 
   socket.on('chat-message', ({ roomCode, text }) => {
-    socket.to(roomCode).emit('chat-message', { text, from: socket.id });
+    console.log(`Chat message in room ${roomCode}:`, text);
+    socket.to(roomCode).emit('chat-message', { 
+      text, 
+      from: socket.id 
+    });
   });
 
   socket.on('end-call', ({ roomCode }) => {
@@ -90,7 +118,9 @@ io.on('connection', (socket) => {
     rooms.forEach((roomData, roomCode) => {
       if (roomData.sockets.has(socket.id)) {
         roomData.sockets.delete(socket.id);
-        socket.to(roomCode).emit('peer-left', socket.id);
+        socket.to(roomCode).emit('peer-left', { socketId: socket.id });
+        
+        console.log(`User ${socket.id} left room ${roomCode}`);
         
         if (roomData.sockets.size === 0) {
           rooms.delete(roomCode);
