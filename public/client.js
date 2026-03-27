@@ -7,6 +7,7 @@ let isMuted = false;
 let isCameraOff = false;
 let pendingIceCandidates = [];
 let roomExpired = false;
+let viewMode = 'side-by-side';
 
 const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -134,11 +135,7 @@ async function createPeerConnection() {
   
   peerConnection.oniceconnectionstatechange = () => {
     console.log('ICE connection state:', peerConnection.iceConnectionState);
-    if (peerConnection.iceConnectionState === 'connected') {
-      updateConnectionStatus('connected', 'Connected');
-    } else if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
-      updateConnectionStatus('disconnected', 'Peer disconnected');
-    }
+    updateSignalIndicator(peerConnection.iceConnectionState);
   };
   
   localStream.getTracks().forEach(track => {
@@ -149,6 +146,35 @@ async function createPeerConnection() {
     const candidate = pendingIceCandidates.shift();
     await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
   }
+}
+
+function updateSignalIndicator(state) {
+  const indicator = document.getElementById('signalIndicator');
+  const status = document.getElementById('signalStatus');
+  
+  indicator.classList.remove('connected', 'disconnected', 'poor');
+  
+  switch (state) {
+    case 'connected':
+    case 'completed':
+      indicator.classList.add('connected');
+      status.textContent = 'Connected';
+      break;
+    case 'checking':
+      indicator.classList.add('poor');
+      status.textContent = 'Connecting...';
+      break;
+    case 'disconnected':
+    case 'failed':
+      indicator.classList.add('disconnected');
+      status.textContent = 'Disconnected';
+      break;
+    default:
+      indicator.classList.add('poor');
+      status.textContent = 'Connecting...';
+  }
+  
+  lucide.createIcons();
 }
 
 function handlePeerDisconnected() {
@@ -239,6 +265,25 @@ function toggleCamera() {
   }
 }
 
+function toggleViewMode() {
+  const videoGrid = document.getElementById('videoGrid');
+  const viewModeBtn = document.getElementById('viewModeBtn');
+  
+  if (viewMode === 'side-by-side') {
+    viewMode = 'focus';
+    videoGrid.classList.remove('side-by-side');
+    videoGrid.classList.add('focus-mode');
+    viewModeBtn.querySelector('i').setAttribute('data-lucide', 'user');
+  } else {
+    viewMode = 'side-by-side';
+    videoGrid.classList.remove('focus-mode');
+    videoGrid.classList.add('side-by-side');
+    viewModeBtn.querySelector('i').setAttribute('data-lucide', 'layout-grid');
+  }
+  
+  lucide.createIcons();
+}
+
 function endCall() {
   if (socket) {
     socket.emit('end-call', { roomCode });
@@ -268,13 +313,24 @@ function returnHome() {
   
   document.getElementById('welcomeScreen').style.display = 'flex';
   document.getElementById('videoScreen').classList.remove('active');
-  document.getElementById('roomInfo').style.display = 'none';
   document.getElementById('videoPlaceholder').classList.remove('hidden');
   document.getElementById('remoteLabel').textContent = 'Waiting for peer...';
-  document.getElementById('roomCodeDisplay').textContent = '';
+  document.getElementById('roomCodeDisplay').textContent = '------';
   document.getElementById('chatMessages').innerHTML = '';
   document.getElementById('chatOverlay').classList.add('collapsed');
   document.getElementById('chatBubble').classList.remove('show');
+  
+  const videoGrid = document.getElementById('videoGrid');
+  videoGrid.classList.remove('focus-mode');
+  videoGrid.classList.add('side-by-side');
+  viewMode = 'side-by-side';
+  
+  const viewModeBtn = document.getElementById('viewModeBtn');
+  viewModeBtn.querySelector('i').setAttribute('data-lucide', 'layout-grid');
+  
+  const signalIndicator = document.getElementById('signalIndicator');
+  signalIndicator.classList.remove('connected', 'disconnected', 'poor');
+  document.getElementById('signalStatus').textContent = 'Connecting...';
   
   roomCode = null;
   isInitiator = false;
@@ -325,9 +381,11 @@ async function joinRoom(code) {
 function showVideoScreen() {
   document.getElementById('welcomeScreen').style.display = 'none';
   document.getElementById('videoScreen').classList.add('active');
-  document.getElementById('roomInfo').style.display = 'flex';
   document.getElementById('roomCodeDisplay').textContent = roomCode;
   document.getElementById('chatBubble').classList.add('show');
+  
+  document.getElementById('signalIndicator').classList.add('poor');
+  document.getElementById('signalStatus').textContent = 'Connecting...';
   
   lucide.createIcons();
 }
@@ -360,7 +418,7 @@ document.getElementById('copyRoomBtn').addEventListener('click', () => {
 document.getElementById('toggleMicBtn').addEventListener('click', toggleMic);
 document.getElementById('toggleCameraBtn').addEventListener('click', toggleCamera);
 document.getElementById('endCallBtn').addEventListener('click', endCall);
-
+document.getElementById('viewModeBtn').addEventListener('click', toggleViewMode);
 document.getElementById('returnHomeBtn').addEventListener('click', returnHome);
 
 document.getElementById('chatBubble').addEventListener('click', () => {

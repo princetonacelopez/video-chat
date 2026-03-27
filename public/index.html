@@ -51,7 +51,7 @@
       </div>
 
       <div class="video-screen" id="videoScreen">
-        <div class="video-grid">
+        <div class="video-grid side-by-side" id="videoGrid">
           <div class="video-container remote">
             <video id="remoteVideo" autoplay playsinline></video>
             <div class="video-placeholder" id="videoPlaceholder">
@@ -70,10 +70,19 @@
         </div>
 
         <div class="status-bar" id="statusBar">
-          <div class="status-item">
-            <i data-lucide="wifi"></i>
-            <span id="connectionStatus">Connecting...</span>
+          <div class="room-code-pill" id="roomCodePill">
+            <span id="roomCodeDisplay">------</span>
+            <button class="copy-btn" id="copyRoomBtn" title="Copy room code">
+              <i data-lucide="copy"></i>
+            </button>
           </div>
+          <div class="signal-indicator" id="signalIndicator">
+            <i data-lucide="signal"></i>
+            <span id="signalStatus">Connecting...</span>
+          </div>
+          <button class="view-mode-btn" id="viewModeBtn" title="Toggle view mode">
+            <i data-lucide="layout-grid"></i>
+          </button>
         </div>
 
         <div class="controls">

@@ -37,19 +37,23 @@
   box-sizing: border-box;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   background: #1a1a2e;
   color: var(--text-primary);
-  min-height: 100vh;
-  overflow: hidden;
 }
 
 .app {
-  min-height: 100vh;
+  height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
-  position: relative;
+  overflow: hidden;
 }
 
 .header {
@@ -61,6 +65,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 0;
+  overflow: hidden;
 }
 
 .welcome-screen {
@@ -218,6 +223,7 @@ body {
   display: none;
   position: relative;
   background: #000;
+  overflow: hidden;
 }
 
 .video-screen.active {
@@ -228,6 +234,36 @@ body {
   position: absolute;
   inset: 0;
   display: flex;
+  gap: 0;
+}
+
+.video-grid.side-by-side {
+  flex-direction: row;
+}
+
+.video-grid.side-by-side .video-container {
+  width: 50%;
+  height: 100%;
+}
+
+.video-grid.focus-mode {
+  flex-direction: column;
+}
+
+.video-grid.focus-mode .video-container.remote {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.video-grid.focus-mode .video-container.local {
+  position: absolute;
+  bottom: 100px;
+  right: 20px;
+  width: 180px;
+  height: 135px;
+  z-index: 10;
 }
 
 .video-container {
@@ -244,8 +280,8 @@ body {
 }
 
 .video-container.remote {
-  position: absolute;
-  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .video-container.remote video {
@@ -360,6 +396,8 @@ body {
 .control-btn.end-call {
   background: #ef4444;
   width: 64px;
+  height: 52px;
+  border-radius: 26px;
 }
 
 .control-btn.end-call:hover {
@@ -546,6 +584,10 @@ body {
   position: absolute;
   top: 20px;
   left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 8px 16px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(12px);
@@ -553,25 +595,90 @@ body {
   z-index: 15;
 }
 
-.status-item {
+.room-code-pill {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
 }
 
-.status-item i {
-  width: 14px;
-  height: 14px;
+.room-code-pill span {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: white;
 }
 
-.status-item.connected {
+.copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  transition: var(--transition);
+}
+
+.copy-btn:hover {
+  color: white;
+}
+
+.signal-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.signal-indicator i {
+  width: 16px;
+  height: 16px;
+  color: #fbbf24;
+}
+
+.signal-indicator.connected i {
   color: #6ee7b7;
 }
 
-.status-item.disconnected {
+.signal-indicator.disconnected i {
   color: #f87171;
+}
+
+.signal-indicator.poor i {
+  color: #fbbf24;
+}
+
+.signal-indicator span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: white;
+  transition: var(--transition);
+}
+
+.view-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.view-mode-btn i {
+  width: 18px;
+  height: 18px;
 }
 
 .end-call-overlay {
@@ -612,10 +719,26 @@ body {
     max-width: none;
   }
   
+  .video-grid.side-by-side {
+    flex-direction: column;
+  }
+  
+  .video-grid.side-by-side .video-container {
+    width: 100%;
+    height: 50%;
+  }
+  
   .video-container.local {
     width: 100px;
     height: 75px;
     top: 10px;
+    right: 10px;
+  }
+  
+  .video-grid.focus-mode .video-container.local {
+    width: 90px;
+    height: 67px;
+    bottom: 100px;
     right: 10px;
   }
   
@@ -644,5 +767,20 @@ body {
   .chat-bubble {
     right: 15px;
     bottom: 100px;
+  }
+  
+  .status-bar {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    padding: 6px 12px;
+  }
+  
+  .room-code-pill span {
+    font-size: 0.8rem;
+  }
+  
+  .signal-indicator span {
+    display: none;
   }
 }
