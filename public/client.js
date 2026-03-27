@@ -5,10 +5,12 @@ let localStream = null;
 let isInitiator = false;
 let isMuted = false;
 let isCameraOff = false;
+let pendingIceCandidates = [];
 
 const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' }
 ];
 
 function generateRoomCode() {
@@ -76,12 +78,14 @@ function connectToServer(code) {
   });
 
   socket.on('ice-candidate', async ({ candidate }) => {
-    if (peerConnection) {
+    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
       try {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) {
         console.error('Error adding ICE candidate:', e);
       }
+    } else {
+      pendingIceCandidates.push(candidate);
     }
   });
 
@@ -122,7 +126,7 @@ async function createPeerConnection() {
     console.log('ICE connection state:', peerConnection.iceConnectionState);
     if (peerConnection.iceConnectionState === 'connected') {
       updateConnectionStatus('connected', 'Connected');
-    } else if (peerConnection.iceConnectionState === 'disconnected') {
+    } else if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
       updateConnectionStatus('disconnected', 'Peer disconnected');
     }
   };
@@ -130,6 +134,11 @@ async function createPeerConnection() {
   localStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localStream);
   });
+  
+  while (pendingIceCandidates.length > 0) {
+    const candidate = pendingIceCandidates.shift();
+    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+  }
 }
 
 function handlePeerDisconnected() {
