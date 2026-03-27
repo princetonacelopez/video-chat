@@ -6,6 +6,7 @@ let isInitiator = false;
 let isMuted = false;
 let isCameraOff = false;
 let pendingIceCandidates = [];
+let roomExpired = false;
 
 const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -41,7 +42,11 @@ function connectToServer(code) {
   socket.on('connect', () => {
     console.log('Connected to server');
     updateConnectionStatus('connected', 'Connected');
-    socket.emit('join-room', roomCode);
+    socket.emit('join-room', { roomCode, isInitiator });
+  });
+
+  socket.on('room-expired', () => {
+    showEndCallOverlay('Room expired');
   });
 
   socket.on('peer-count', (count) => {
@@ -61,6 +66,11 @@ function connectToServer(code) {
   socket.on('peer-left', (peerId) => {
     console.log('Peer left:', peerId);
     handlePeerDisconnected();
+  });
+
+  socket.on('call-ended', () => {
+    console.log('Call ended by peer');
+    handleCallEnded();
   });
 
   socket.on('offer', async ({ offer, from }) => {
@@ -152,6 +162,29 @@ function handlePeerDisconnected() {
   }
 }
 
+function handleCallEnded() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  
+  showEndCallOverlay('Peer ended the call');
+}
+
+function showEndCallOverlay(message) {
+  document.getElementById('endCallOverlay').querySelector('p').textContent = message;
+  document.getElementById('endCallOverlay').classList.add('show');
+}
+
+function hideEndCallOverlay() {
+  document.getElementById('endCallOverlay').classList.remove('show');
+}
+
 function addChatMessage(text, type) {
   const messagesContainer = document.getElementById('chatMessages');
   const messageElement = document.createElement('div');
@@ -206,7 +239,58 @@ function toggleCamera() {
   }
 }
 
+function endCall() {
+  if (socket) {
+    socket.emit('end-call', { roomCode });
+  }
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  
+  roomExpired = true;
+  showEndCallOverlay('Call ended');
+}
+
+function returnHome() {
+  hideEndCallOverlay();
+  
+  document.getElementById('welcomeScreen').style.display = 'flex';
+  document.getElementById('videoScreen').classList.remove('active');
+  document.getElementById('roomInfo').style.display = 'none';
+  document.getElementById('videoPlaceholder').classList.remove('hidden');
+  document.getElementById('remoteLabel').textContent = 'Waiting for peer...';
+  document.getElementById('roomCodeDisplay').textContent = '';
+  document.getElementById('chatMessages').innerHTML = '';
+  document.getElementById('chatOverlay').classList.add('collapsed');
+  document.getElementById('chatBubble').classList.remove('show');
+  
+  roomCode = null;
+  isInitiator = false;
+  isMuted = false;
+  isCameraOff = false;
+  roomExpired = false;
+  
+  lucide.createIcons();
+}
+
 async function createRoom() {
+  if (roomExpired) {
+    alert('Please refresh the page to create a new room');
+    return;
+  }
+  
   const hasMedia = await initLocalStream();
   if (!hasMedia) return;
   
@@ -218,6 +302,11 @@ async function createRoom() {
 }
 
 async function joinRoom(code) {
+  if (roomExpired) {
+    alert('This room has expired. Please ask the host to create a new room.');
+    return;
+  }
+  
   if (!code || code.length < 4) {
     alert('Please enter a valid room code');
     return;
@@ -235,45 +324,10 @@ async function joinRoom(code) {
 
 function showVideoScreen() {
   document.getElementById('welcomeScreen').style.display = 'none';
-  document.getElementById('videoScreen').style.display = 'flex';
-  document.getElementById('roomInfo').style.display = 'flex';
-  document.getElementById('statusBar').style.display = 'flex';
-  document.getElementById('roomCodeDisplay').textContent = roomCode;
-  
   document.getElementById('videoScreen').classList.add('active');
-  
-  lucide.createIcons();
-}
-
-function endCall() {
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-  
-  if (socket) {
-    socket.disconnect();
-    socket = null;
-  }
-  
-  document.getElementById('welcomeScreen').style.display = 'flex';
-  document.getElementById('videoScreen').style.display = 'none';
-  document.getElementById('roomInfo').style.display = 'none';
-  document.getElementById('statusBar').style.display = 'none';
-  document.getElementById('videoPlaceholder').classList.remove('hidden');
-  document.getElementById('remoteLabel').textContent = 'Waiting for peer...';
-  document.getElementById('roomCodeDisplay').textContent = '';
-  document.getElementById('chatMessages').innerHTML = '';
-  
-  roomCode = null;
-  isInitiator = false;
-  isMuted = false;
-  isCameraOff = false;
+  document.getElementById('roomInfo').style.display = 'flex';
+  document.getElementById('roomCodeDisplay').textContent = roomCode;
+  document.getElementById('chatBubble').classList.add('show');
   
   lucide.createIcons();
 }
@@ -307,11 +361,16 @@ document.getElementById('toggleMicBtn').addEventListener('click', toggleMic);
 document.getElementById('toggleCameraBtn').addEventListener('click', toggleCamera);
 document.getElementById('endCallBtn').addEventListener('click', endCall);
 
+document.getElementById('returnHomeBtn').addEventListener('click', returnHome);
+
+document.getElementById('chatBubble').addEventListener('click', () => {
+  document.getElementById('chatOverlay').classList.remove('collapsed');
+  document.getElementById('chatBubble').classList.remove('show');
+});
+
 document.getElementById('toggleChatBtn').addEventListener('click', () => {
-  document.getElementById('chatOverlay').classList.toggle('collapsed');
-  const icon = document.getElementById('toggleChatBtn').querySelector('i');
-  icon.setAttribute('data-lucide', document.getElementById('chatOverlay').classList.contains('collapsed') ? 'chevron-up' : 'chevron-down');
-  lucide.createIcons();
+  document.getElementById('chatOverlay').classList.add('collapsed');
+  document.getElementById('chatBubble').classList.add('show');
 });
 
 document.getElementById('emojiBtn').addEventListener('click', () => {

@@ -24,17 +24,33 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join-room', (roomCode) => {
+  socket.on('join-room', ({ roomCode, isInitiator }) => {
+    const room = rooms.get(roomCode);
+    
+    if (room && room.expired) {
+      socket.emit('room-expired');
+      return;
+    }
+    
+    if (room && room.size >= 2) {
+      socket.emit('room-full');
+      return;
+    }
+    
     socket.join(roomCode);
     
     if (!rooms.has(roomCode)) {
-      rooms.set(roomCode, new Set());
+      rooms.set(roomCode, {
+        sockets: new Set(),
+        initiator: isInitiator,
+        expired: false
+      });
     }
     
-    const room = rooms.get(roomCode);
-    room.add(socket.id);
+    const roomData = rooms.get(roomCode);
+    roomData.sockets.add(socket.id);
     
-    const peerCount = room.size;
+    const peerCount = roomData.sockets.size;
     socket.emit('peer-count', peerCount);
     socket.to(roomCode).emit('peer-joined', socket.id);
     
@@ -57,16 +73,28 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('chat-message', { text, from: socket.id });
   });
 
+  socket.on('end-call', ({ roomCode }) => {
+    console.log(`End call requested in room ${roomCode}`);
+    
+    const room = rooms.get(roomCode);
+    if (room) {
+      room.expired = true;
+    }
+    
+    socket.to(roomCode).emit('call-ended');
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     
-    rooms.forEach((room, roomCode) => {
-      if (room.has(socket.id)) {
-        room.delete(socket.id);
+    rooms.forEach((roomData, roomCode) => {
+      if (roomData.sockets.has(socket.id)) {
+        roomData.sockets.delete(socket.id);
         socket.to(roomCode).emit('peer-left', socket.id);
         
-        if (room.size === 0) {
+        if (roomData.sockets.size === 0) {
           rooms.delete(roomCode);
+          console.log(`Room ${roomCode} deleted`);
         }
       }
     });
