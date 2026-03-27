@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Chat</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">
+        <i data-lucide="video"></i>
+        <span>Video Chat</span>
+      </div>
+      <div class="room-info" id="roomInfo" style="display: none;">
+        <span class="room-code" id="roomCodeDisplay"></span>
+        <button class="icon-btn" id="copyRoomBtn" title="Copy room code">
+          <i data-lucide="copy"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-card">
+          <h1>Welcome</h1>
+          <p>Start or join a video conversation</p>
+          
+          <div class="room-actions">
+            <button class="btn btn-primary" id="createRoomBtn">
+              <i data-lucide="plus"></i>
+              Create Room
+            </button>
+            
+            <div class="divider">
+              <span>or</span>
+            </div>
+            
+            <div class="join-form">
+              <input type="text" id="roomCodeInput" placeholder="Enter room code" maxlength="6">
+              <button class="btn btn-secondary" id="joinRoomBtn">
+                <i data-lucide="log-in"></i>
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="video-screen" id="videoScreen" style="display: none;">
+        <div class="video-grid">
+          <div class="video-container local">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="video-label">
+              <span>You</span>
+            </div>
+          </div>
+          <div class="video-container remote">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="video-label">
+              <span id="remoteLabel">Waiting for peer...</span>
+            </div>
+            <div class="video-placeholder" id="videoPlaceholder">
+              <i data-lucide="user"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="control-btn" id="toggleMicBtn" title="Toggle microphone">
+            <i data-lucide="mic"></i>
+          </button>
+          <button class="control-btn" id="toggleCameraBtn" title="Toggle camera">
+            <i data-lucide="video"></i>
+          </button>
+          <button class="control-btn end-call" id="endCallBtn" title="End call">
+            <i data-lucide="phone-off"></i>
+          </button>
+        </div>
+
+        <div class="chat-overlay" id="chatOverlay">
+          <div class="chat-header">
+            <span>Chat</span>
+            <button class="icon-btn" id="toggleChatBtn">
+              <i data-lucide="chevron-down"></i>
+            </button>
+          </div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input">
+            <button class="icon-btn" id="emojiBtn">
+              <i data-lucide="smile"></i>
+            </button>
+            <input type="text" id="chatInput" placeholder="Type a message...">
+            <button class="icon-btn" id="sendChatBtn">
+              <i data-lucide="send"></i>
+            </button>
+          </div>
+          <div class="emoji-picker" id="emojiPicker" style="display: none;">
+            <button class="emoji-btn">😀</button>
+            <button class="emoji-btn">😂</button>
+            <button class="emoji-btn">🥰</button>
+            <button class="emoji-btn">😎</button>
+            <button class="emoji-btn">🤔</button>
+            <button class="emoji-btn">😴</button>
+            <button class="emoji-btn">😭</button>
+            <button class="emoji-btn">😡</button>
+            <button class="emoji-btn">👋</button>
+            <button class="emoji-btn">👍</button>
+            <button class="emoji-btn">👎</button>
+            <button class="emoji-btn">❤️</button>
+            <button class="emoji-btn">🎉</button>
+            <button class="emoji-btn">🔥</button>
+            <button class="emoji-btn">✨</button>
+            <button class="emoji-btn">💯</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar" id="statusBar" style="display: none;">
+        <div class="status-item">
+          <i data-lucide="wifi"></i>
+          <span id="connectionStatus">Connecting...</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+  <script src="client.js"></script>
+</body>
+</html>

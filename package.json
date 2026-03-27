@@ -1,0 +1,15 @@
+{
+  "name": "video-chat-webtransport",
+  "version": "1.0.0",
+  "description": "Video chat app using WebTransport and WebRTC",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "dependencies": {
+    "@fails-components/webtransport": "^1.5.3",
+    "@fails-components/webtransport-transport-http3-quiche": "^1.5.3",
+    "express": "^4.18.2"
+  }
+}
