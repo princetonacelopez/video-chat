@@ -1,6 +1,4 @@
-const SERVER_URL = window.location.origin;
-
-let transport = null;
+let socket = null;
 let peerConnection = null;
 let roomCode = null;
 let localStream = null;
@@ -33,92 +31,75 @@ async function initLocalStream() {
   }
 }
 
-async function connectToServer(code) {
+function connectToServer(code) {
   roomCode = code;
   
-  try {
-    transport = new WebTransport(`${SERVER_URL}/wt/${code}`);
-    await transport.ready;
-    
-    console.log('WebTransport connected');
+  socket = io();
+  
+  socket.on('connect', () => {
+    console.log('Connected to server');
     updateConnectionStatus('connected', 'Connected');
-    
-    setupTransportListeners();
-    return true;
-  } catch (err) {
-    console.error('WebTransport connection error:', err);
-    updateConnectionStatus('disconnected', 'Connection failed');
-    return false;
-  }
-}
+    socket.emit('join-room', roomCode);
+  });
 
-function setupTransportListeners() {
-  transport.datagramsReadable.on('data', (data) => {
-    try {
-      const message = JSON.parse(data);
-      handleSignalingMessage(message);
-    } catch (e) {
-      console.error('Error parsing message:', e);
+  socket.on('peer-count', (count) => {
+    console.log('Peer count:', count);
+    if (count === 2 && !isInitiator) {
+      createPeerConnectionAndOffer();
     }
   });
-  
-  transport.closed.then(() => {
-    console.log('WebTransport closed');
+
+  socket.on('peer-joined', async (peerId) => {
+    console.log('Peer joined:', peerId);
+    if (isInitiator) {
+      await createPeerConnectionAndOffer();
+    }
+  });
+
+  socket.on('peer-left', (peerId) => {
+    console.log('Peer left:', peerId);
+    handlePeerDisconnected();
+  });
+
+  socket.on('offer', async ({ offer, from }) => {
+    console.log('Received offer');
+    await createPeerConnection();
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('answer', { roomCode, answer });
+  });
+
+  socket.on('answer', async ({ answer }) => {
+    console.log('Received answer');
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('ice-candidate', async ({ candidate }) => {
+    if (peerConnection) {
+      try {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.error('Error adding ICE candidate:', e);
+      }
+    }
+  });
+
+  socket.on('chat-message', ({ text, from }) => {
+    addChatMessage(text, 'received');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Disconnected from server');
     updateConnectionStatus('disconnected', 'Disconnected');
   });
-  
-  transport.closed.catch((err) => {
-    console.error('WebTransport error:', err);
-    updateConnectionStatus('disconnected', 'Connection lost');
-  });
 }
 
-async function sendSignalingMessage(message) {
-  if (!transport || transport.closed) return;
-  
-  try {
-    const writer = transport.datagrams.writable.getWriter();
-    await writer.write(JSON.stringify(message));
-    writer.releaseLock();
-  } catch (e) {
-    console.error('Error sending message:', e);
-  }
-}
-
-async function handleSignalingMessage(message) {
-  console.log('Received:', message.type);
-  
-  switch (message.type) {
-    case 'peer-ready':
-      if (!isInitiator) {
-        await createPeerConnection();
-        await createOffer();
-      }
-      break;
-      
-    case 'offer':
-      if (!isInitiator) {
-        await createPeerConnection();
-        await handleOffer(message.sdp);
-      }
-      break;
-      
-    case 'answer':
-      await handleAnswer(message.sdp);
-      break;
-      
-    case 'ice-candidate':
-      await handleIceCandidate(message.candidate);
-      break;
-      
-    case 'chat':
-      addChatMessage(message.text, 'received');
-      break;
-      
-    case 'peer-disconnected':
-      handlePeerDisconnected();
-      break;
-  }
+async function createPeerConnectionAndOffer() {
+  await createPeerConnection();
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  socket.emit('offer', { roomCode, offer: offer });
 }
 
 async function createPeerConnection() {
@@ -126,10 +107,7 @@ async function createPeerConnection() {
   
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      sendSignalingMessage({
-        type: 'ice-candidate',
-        candidate: event.candidate
-      });
+      socket.emit('ice-candidate', { roomCode, candidate: event.candidate });
     }
   };
   
@@ -154,40 +132,6 @@ async function createPeerConnection() {
   });
 }
 
-async function createOffer() {
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-  
-  sendSignalingMessage({
-    type: 'offer',
-    sdp: offer
-  });
-}
-
-async function handleOffer(sdp) {
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
-  
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-  
-  sendSignalingMessage({
-    type: 'answer',
-    sdp: answer
-  });
-}
-
-async function handleAnswer(sdp) {
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
-}
-
-async function handleIceCandidate(candidate) {
-  try {
-    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-  } catch (e) {
-    console.error('Error adding ICE candidate:', e);
-  }
-}
-
 function handlePeerDisconnected() {
   document.getElementById('remoteVideo').srcObject = null;
   document.getElementById('videoPlaceholder').classList.remove('hidden');
@@ -210,10 +154,7 @@ function addChatMessage(text, type) {
 
 function sendChatMessage(text) {
   addChatMessage(text, 'sent');
-  sendSignalingMessage({
-    type: 'chat',
-    text: text
-  });
+  socket.emit('chat-message', { roomCode, text });
 }
 
 function updateConnectionStatus(status, text) {
@@ -264,7 +205,7 @@ async function createRoom() {
   isInitiator = true;
   
   showVideoScreen();
-  await connectToServer(roomCode);
+  connectToServer(roomCode);
 }
 
 async function joinRoom(code) {
@@ -280,14 +221,7 @@ async function joinRoom(code) {
   isInitiator = false;
   
   showVideoScreen();
-  await connectToServer(roomCode);
-  
-  setTimeout(async () => {
-    if (!isInitiator) {
-      await createPeerConnection();
-      await createOffer();
-    }
-  }, 1000);
+  connectToServer(roomCode);
 }
 
 function showVideoScreen() {
@@ -313,9 +247,9 @@ function endCall() {
     peerConnection = null;
   }
   
-  if (transport) {
-    transport.close();
-    transport = null;
+  if (socket) {
+    socket.disconnect();
+    socket = null;
   }
   
   document.getElementById('welcomeScreen').style.display = 'flex';

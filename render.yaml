@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: video-chat
+    env: node
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
+    github:
+      owner: princetonacelopez
+      repo: video-chat
